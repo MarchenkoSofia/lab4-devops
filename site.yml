@@ -1,0 +1,65 @@
+---
+- name: Deploy Lab 4 Service
+  hosts: lab4
+  become: yes
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - python3
+          - curl
+        state: present
+        update_cache: yes
+
+    - name: Ensure service directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      loop:
+        - /opt/lab4-service
+        - /opt/lab4-service/html
+
+    - name: Deploy index.html with student surname
+      copy:
+        content: "<h1>Marchenko</h1>\n"
+        dest: /opt/lab4-service/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Copy service.sh
+      copy:
+        src: service.sh
+        dest: /opt/lab4-service/service.sh
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Copy systemd unit file
+      copy:
+        src: lab4-service.service
+        dest: /etc/systemd/system/lab4-service.service
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Reload systemd, enable and start service
+      systemd:
+        daemon_reload: yes
+        name: lab4-service
+        enabled: yes
+        state: started
+
+    - name: Healthcheck - verify HTTP 200
+      uri:
+        url: http://127.0.0.1:8000/
+        return_content: yes
+        status_code: 200
+      register: health_result
+
+    - name: Print Healthcheck result
+      debug:
+        msg: "Service is UP! HTTP Status: {{ health_result.status }}"
